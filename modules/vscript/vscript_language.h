@@ -98,6 +98,8 @@ public:
 	 */
 	void auto_indent_code(String& p_code, int p_from_line, int p_to_line) const {}
 
+	bool uses_text_editor() const { return false; }
+
 	//////////////////////////////////////////////////////////////////////////
 	// DEBUGGER FUNCTIONS
 
