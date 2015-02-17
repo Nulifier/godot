@@ -1732,7 +1732,16 @@ void ScriptEditorPlugin::edit(Object *p_object) {
 
 bool ScriptEditorPlugin::handles(Object *p_object) const {
 
-	return p_object->is_type("Script");
+	Script* script = p_object->cast_to<Script>();
+	if (!script) {
+		return false;
+	}
+	else if (script->get_language()->uses_text_editor()) {
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 void ScriptEditorPlugin::make_visible(bool p_visible) {

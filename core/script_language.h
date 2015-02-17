@@ -146,6 +146,7 @@ public:
 	virtual String make_function(const String& p_class,const String& p_name,const StringArray& p_args) const=0;
 	virtual Error complete_code(const String& p_code, const String& p_base_path, Object*p_owner,List<String>* r_options,String& r_call_hint) { return ERR_UNAVAILABLE; }
 	virtual void auto_indent_code(String& p_code,int p_from_line,int p_to_line) const=0;
+	virtual bool uses_text_editor() const { return true; }	///< Returns true if this language uses a text editor for editing script files.
 
 	/* DEBUGGER FUNCTIONS */
 
