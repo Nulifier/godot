@@ -5,6 +5,10 @@
 #include "vscript_loader.h"
 #include "vscript_saver.h"
 
+#ifdef TOOLS_ENABLED
+#include "vscript_editor_plugin.h"
+#endif
+
 VScriptLanguage* script_language_vscript = NULL;
 ResourceFormatLoaderVScript* resource_loader_vscript = NULL;
 ResourceFormatSaverVScript* resource_saver_vscript = NULL;
@@ -16,11 +20,15 @@ void register_vscript_types() {
 	script_language_vscript = memnew(VScriptLanguage);
 	ScriptServer::register_language(script_language_vscript);
 
-	resource_loader_vscript = memnew(ResourceFormatLoaderVScript);
+	/*resource_loader_vscript = memnew(ResourceFormatLoaderVScript);
 	ResourceLoader::add_resource_format_loader(resource_loader_vscript);
 
 	resource_saver_vscript = memnew(ResourceFormatSaverVScript);
-	ResourceSaver::add_resource_format_saver(resource_saver_vscript);
+	ResourceSaver::add_resource_format_saver(resource_saver_vscript);*/
+
+#ifdef TOOLS_ENABLED
+	EditorPlugins::add_by_type<VScriptEditorPlugin>();
+#endif
 }
 
 void unregister_vscript_types() {
@@ -30,7 +38,7 @@ void unregister_vscript_types() {
 		script_language_vscript = NULL;
 	}
 
-	if (resource_loader_vscript) {
+	/*if (resource_loader_vscript) {
 		memdelete(resource_loader_vscript);
 		resource_loader_vscript = NULL;
 	}
@@ -38,5 +46,5 @@ void unregister_vscript_types() {
 	if (resource_saver_vscript) {
 		memdelete(resource_saver_vscript);
 		resource_saver_vscript = NULL;
-	}
+	}*/
 }
