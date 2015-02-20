@@ -34,11 +34,32 @@ void VScript::node_add(NodeType p_node_type, int p_id)
 	node.type = p_node_type;
 	node.id = p_id;
 
+	// Initialize the node with default values here
 	switch (p_node_type)
 	{
-	case VScript::NODE_COMMENT:
+	case NODE_NOTIFICATION_EVENT:
+		node.param1 = -1;	// Notification being watched
 		break;
-	case VScript::NODE_TYPE_MAX:
+	case NODE_FUNCTION_EVENT:
+		node.param1 = "";	// Function name
+		break;
+	case NODE_BOOL_CONST:
+		node.param1 = false;// Constant value
+		break;
+	case NODE_INT_CONST:
+		node.param1 = 0;	// Constant value
+		break;
+	case NODE_FLOAT_CONST:
+		node.param1 = 0.0;	// Constant value
+		break;
+	case NODE_STRING_CONST:
+		node.param1 = "";	// Constant value
+		break;
+	case NODE_PRINT:
+		break;
+	case NODE_COMMENT:
+		break;
+	case NODE_TYPE_MAX:
 		break;
 	}
 
@@ -86,27 +107,112 @@ Point2 VScript::node_get_pos(int p_id) const
 	return m_node_map[p_id].pos;
 }
 
+// This is just to save some typing
+#define CHECK_GET_NODE(id, req_type) \
+	ERR_FAIL_COND(!m_node_map.has(id)); \
+	Node& n = m_node_map[(id)]; \
+	ERR_FAIL_COND(n.type != (req_type))
+#define CHECK_GET_NODE_V(id, req_type, def_val) \
+	ERR_FAIL_COND_V(!m_node_map.has(id), def_val); \
+	const Node& n = m_node_map[(id)]; \
+	ERR_FAIL_COND_V(n.type != (req_type), def_val)
+
+void VScript::notification_event_node_set_value(int p_id, int p_notification)
+{
+	CHECK_GET_NODE(p_id, NODE_NOTIFICATION_EVENT);
+	n.param1 = p_notification;
+	_request_update();
+}
+
+int VScript::notification_event_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_NOTIFICATION_EVENT, 0);
+	return n.param1;
+}
+
+void VScript::function_event_node_set_value(int p_id, const String& p_func_name)
+{
+	CHECK_GET_NODE(p_id, NODE_FUNCTION_EVENT);
+	n.param1 = p_func_name;
+}
+
+String VScript::function_event_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_FUNCTION_EVENT, String());
+	return n.param1;
+}
+
+void VScript::bool_const_node_set_value(int p_id, bool p_value)
+{
+	CHECK_GET_NODE(p_id, NODE_BOOL_CONST);
+	n.param1 = p_value;
+	_request_update();
+}
+
+bool VScript::bool_const_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_BOOL_CONST, 0);
+	return n.param1;
+}
+
+void VScript::int_const_node_set_value(int p_id, int p_value)
+{
+	CHECK_GET_NODE(p_id, NODE_INT_CONST);
+	n.param1 = p_value;
+	_request_update();
+}
+
+int VScript::int_const_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_INT_CONST, 0);
+	return n.param1;
+}
+
+void VScript::float_const_node_set_value(int p_id, double p_value)
+{
+	CHECK_GET_NODE(p_id, NODE_FLOAT_CONST);
+	n.param1 = p_value;
+	_request_update();
+}
+
+double VScript::float_const_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_FLOAT_CONST, 0.0);
+	return n.param1;
+}
+
+void VScript::string_const_node_set_value(int p_id, const String& p_string)
+{
+	CHECK_GET_NODE(p_id, NODE_STRING_CONST);
+	n.param1 = p_string;
+}
+
+String VScript::string_const_node_get_value(int p_id) const
+{
+	CHECK_GET_NODE_V(p_id, NODE_STRING_CONST, String());
+	return n.param1;
+}
+
 void VScript::comment_node_set_text(int p_id, const String& p_comment)
 {
-	ERR_FAIL_COND(!m_node_map.has(p_id));
-	Node& n = m_node_map[p_id];
-	ERR_FAIL_COND(n.type != NODE_COMMENT);
+	CHECK_GET_NODE(p_id, NODE_COMMENT);
 	n.param1 = p_comment;
 }
 
 String VScript::comment_node_get_text(int p_id) const
 {
-	ERR_FAIL_COND_V(!m_node_map.has(p_id), String());
-	const Node& n = m_node_map[p_id];
-	ERR_FAIL_COND_V(n.type != NODE_COMMENT, String());
+	CHECK_GET_NODE_V(p_id, NODE_COMMENT, String());
 	return n.param1;
 }
+
+#undef CHECK_GET_NODE
+#undef CHECK_GET_NODE_V
 
 Error VScript::connect_node(int p_src_id, int p_src_slot, int p_dst_id, int p_dst_slot)
 {
 	ERR_FAIL_COND_V(p_src_id == p_dst_id, ERR_INVALID_PARAMETER);	// Can't connect to self
-	ERR_FAIL_COND_V(m_node_map.has(p_src_id), ERR_INVALID_PARAMETER);
-	ERR_FAIL_COND_V(m_node_map.has(p_dst_id), ERR_INVALID_PARAMETER);
+	ERR_FAIL_COND_V(!m_node_map.has(p_src_id), ERR_INVALID_PARAMETER);
+	ERR_FAIL_COND_V(!m_node_map.has(p_dst_id), ERR_INVALID_PARAMETER);
 	NodeType type_src = m_node_map[p_src_id].type;
 	NodeType type_dst = m_node_map[p_dst_id].type;
 	ERR_FAIL_INDEX_V(p_src_slot, get_node_output_count(type_src), ERR_INVALID_PARAMETER);
@@ -194,6 +300,13 @@ VScript::GraphError VScript::get_graph_error() const
 
 const VScript::NodeSlotInfo VScript::node_slot_info[NODE_TYPE_MAX] = {
 	// { Type, { ins }, { outs }, { in_names }, { out_names} },
+	{ NODE_NOTIFICATION_EVENT, { SLOT_MAX }, { SLOT_EVENT, SLOT_MAX }, {}, { "Trigger" } },
+	{ NODE_FUNCTION_EVENT, { SLOT_MAX }, { SLOT_EVENT, SLOT_MAX }, {}, { "Trigger" } },
+	{ NODE_BOOL_CONST, { SLOT_MAX }, { SLOT_BOOL, SLOT_MAX }, {}, { "Value" } },
+	{ NODE_INT_CONST, { SLOT_MAX }, { SLOT_INT, SLOT_MAX }, {}, { "Value" } },
+	{ NODE_FLOAT_CONST, { SLOT_MAX }, { SLOT_FLOAT, SLOT_MAX }, {}, { "Value" } },
+	{ NODE_STRING_CONST, { SLOT_MAX }, { SLOT_STRING, SLOT_MAX }, {}, { "Value" } },
+	{ NODE_PRINT, { SLOT_EVENT, SLOT_STRING, SLOT_MAX }, { SLOT_MAX }, { "Print", "Message" }, {} },
 	{ NODE_COMMENT, { SLOT_MAX }, { SLOT_MAX }, {}, {} },
 };
 
@@ -251,21 +364,18 @@ VScript::SlotType VScript::get_node_output_type(NodeType p_type, int p_idx)
 	ERR_FAIL_V(SLOT_MAX);
 }
 
-// We need this because we are returning by reference
-static const String EMPTY_STRING;
-
-const String& VScript::get_node_input_name(NodeType p_type, int p_idx)
+const char* VScript::get_node_input_name(NodeType p_type, int p_idx)
 {
 	// ERR_FAIL_INDEX_V(p_type, NODE_TYPE_MAX, SLOT_MAX);	// Taken care of in get_node_input_slot_count
-	ERR_FAIL_INDEX_V(p_idx, get_node_input_count(p_type), EMPTY_STRING);
+	ERR_FAIL_INDEX_V(p_idx, get_node_input_count(p_type), "");
 
 	return node_slot_info[p_type].in_names[p_idx];
 }
 
-const String& VScript::get_node_output_name(NodeType p_type, int p_idx)
+const char* VScript::get_node_output_name(NodeType p_type, int p_idx)
 {
 	// ERR_FAIL_INDEX_V(p_type, NODE_TYPE_MAX, SLOT_MAX);	// Taken care of in get_node_output_slot_count
-	ERR_FAIL_INDEX_V(p_idx, get_node_output_count(p_type), EMPTY_STRING);
+	ERR_FAIL_INDEX_V(p_idx, get_node_output_count(p_type), "");
 
 	return node_slot_info[p_type].out_names[p_idx];
 }
@@ -394,6 +504,18 @@ void VScript::_bind_methods()
 	ObjectTypeDB::bind_method(_MD("node_set_pos", "id", "pos"), &VScript::node_set_pos);
 	ObjectTypeDB::bind_method(_MD("node_get_pos", "id"), &VScript::node_get_pos);
 
+	ObjectTypeDB::bind_method(_MD("notification_event_node_set_value", "id", "value"), &VScript::notification_event_node_set_value);
+	ObjectTypeDB::bind_method(_MD("notification_event_node_get_value", "id"), &VScript::notification_event_node_get_value);
+	ObjectTypeDB::bind_method(_MD("function_event_node_set_value", "id", "func_name"), &VScript::function_event_node_set_value);
+	ObjectTypeDB::bind_method(_MD("function_event_node_get_value", "id"), &VScript::function_event_node_set_value);
+	ObjectTypeDB::bind_method(_MD("bool_const_node_set_value", "id", "value"), &VScript::bool_const_node_set_value);
+	ObjectTypeDB::bind_method(_MD("bool_const_node_get_value", "id"), &VScript::bool_const_node_get_value);
+	ObjectTypeDB::bind_method(_MD("int_const_node_set_value", "id", "value"), &VScript::int_const_node_set_value);
+	ObjectTypeDB::bind_method(_MD("int_const_node_get_value", "id"), &VScript::int_const_node_get_value);
+	ObjectTypeDB::bind_method(_MD("float_const_node_set_value", "id", "value"), &VScript::float_const_node_set_value);
+	ObjectTypeDB::bind_method(_MD("float_const_node_get_value", "id"), &VScript::float_const_node_get_value);
+	ObjectTypeDB::bind_method(_MD("string_const_node_set_value", "id", "string"), &VScript::string_const_node_set_value);
+	ObjectTypeDB::bind_method(_MD("string_const_node_get_value", "id"), &VScript::string_const_node_get_value);
 	ObjectTypeDB::bind_method(_MD("comment_node_set_text", "id", "text"), &VScript::comment_node_set_text);
 	ObjectTypeDB::bind_method(_MD("comment_node_get_text", "id"), &VScript::comment_node_get_text);
 
@@ -414,8 +536,25 @@ void VScript::_bind_methods()
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "_data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("_set_data"), _SCS("_get_data"));
 
 	// Constants
+	BIND_CONSTANT(NODE_NOTIFICATION_EVENT);
+	BIND_CONSTANT(NODE_FUNCTION_EVENT);
+	BIND_CONSTANT(NODE_BOOL_CONST);
+	BIND_CONSTANT(NODE_INT_CONST);
+	BIND_CONSTANT(NODE_FLOAT_CONST);
+	BIND_CONSTANT(NODE_STRING_CONST);
+	BIND_CONSTANT(NODE_PRINT);
 	BIND_CONSTANT(NODE_COMMENT);
+
 	BIND_CONSTANT(NODE_TYPE_MAX);
+
+	BIND_CONSTANT(SLOT_EVENT);
+	BIND_CONSTANT(SLOT_BOOL);
+	BIND_CONSTANT(SLOT_INT);
+	BIND_CONSTANT(SLOT_FLOAT);
+	BIND_CONSTANT(SLOT_STRING);
+	BIND_CONSTANT(SLOT_MAX);
+
+	BIND_CONSTANT(GRAPH_OK);
 
 	// Signals
 	ADD_SIGNAL(MethodInfo("updated"));

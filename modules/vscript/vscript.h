@@ -23,7 +23,24 @@ public:
 	// * Add a check to  VScript::node_add
 	// * Don't allow the name in VScriptEditor::_notification
 	enum NodeType {
+		// Events
+		NODE_NOTIFICATION_EVENT,
+		NODE_FUNCTION_EVENT,
+
+		// Constants
+		NODE_BOOL_CONST,
+		NODE_INT_CONST,
+		NODE_FLOAT_CONST,
+		NODE_STRING_CONST,
+
+		// Logic
+
+		// Actions
+		NODE_PRINT,
+
+		// Utility
 		NODE_COMMENT,
+
 		NODE_TYPE_MAX
 	};
 
@@ -35,7 +52,14 @@ public:
 	};
 
 	// If you are adding a slot type that can take any input then fix the last check in VScript::connect_node
+	// If you're adding a slot type add it to:
+	// * _bind_methods
 	enum SlotType {
+		SLOT_EVENT,
+		SLOT_BOOL,
+		SLOT_INT,
+		SLOT_FLOAT,
+		SLOT_STRING,
 		SLOT_MAX
 	};
 
@@ -44,7 +68,9 @@ public:
 		SLOT_OUT
 	};
 
-	// If you're adding any error types, fix VScriptEditorView::_script_updated too
+	// If you're adding any error types:
+	// * fix VScriptEditorView::_script_updated too
+	// * Add it to _bind_methods
 	enum GraphError {
 		GRAPH_OK
 	};
@@ -59,6 +85,18 @@ public:
 	Point2 node_get_pos(int p_id) const;
 
 	// Type specific node manipulation
+	void notification_event_node_set_value(int p_id, int p_notification);
+	int notification_event_node_get_value(int p_id) const;
+	void function_event_node_set_value(int p_id, const String& p_func_name);
+	String function_event_node_get_value(int p_id) const;
+	void bool_const_node_set_value(int p_id, bool p_value);
+	bool bool_const_node_get_value(int p_id) const;
+	void int_const_node_set_value(int p_id, int p_value);
+	int int_const_node_get_value(int p_id) const;
+	void float_const_node_set_value(int p_id, double p_value);
+	double float_const_node_get_value(int p_id) const;
+	void string_const_node_set_value(int p_id, const String& p_string);
+	String string_const_node_get_value(int p_id) const;
 	void comment_node_set_text(int p_id, const String& p_comment);
 	String comment_node_get_text(int p_id) const;
 
@@ -74,14 +112,14 @@ public:
 	Variant node_get_state(int p_id) const;
 	void node_set_state(int p_id, const Variant& p_state);
 
-	GraphError get_graph_error() const;	/// @todo Implement
+	GraphError get_graph_error() const;
 
 	static int get_node_input_count(NodeType p_type);
 	static int get_node_output_count(NodeType p_type);
 	static SlotType get_node_input_type(NodeType p_type, int p_idx);
 	static SlotType get_node_output_type(NodeType p_type, int p_idx);
-	static const String& get_node_input_name(NodeType p_type, int p_idx);
-	static const String& get_node_output_name(NodeType p_type, int p_idx);
+	static const char* get_node_input_name(NodeType p_type, int p_idx);
+	static const char* get_node_output_name(NodeType p_type, int p_idx);
 
 private:
 
@@ -113,8 +151,8 @@ private:
 		NodeType type;
 		const SlotType ins[MAX_INS];
 		const SlotType outs[MAX_OUTS];
-		const String in_names[MAX_INS];
-		const String out_names[MAX_OUTS];
+		const char* in_names[MAX_INS];		// I got a weird compiler error if these were Strings
+		const char* out_names[MAX_OUTS];
 	};
 
 	static const NodeSlotInfo node_slot_info[NODE_TYPE_MAX];

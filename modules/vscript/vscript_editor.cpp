@@ -47,16 +47,92 @@ void VScriptEditorView::_create_node(int p_id)
 	gn->set_show_close_button(true);
 
 	// Colors of slots
-	Color type_col[4] = {
-		Color(0.9, 0.4, 1),
-		Color(0.8, 1, 0.2),
-		Color(1, 0.2, 0.2),
-		Color(0, 1, 1)
+	Color type_col[VScript::SLOT_MAX] = {
+		Color(1, 1, 1),			// Event
+		Color(0.8, 1, 0.2),		// Boolean
+		Color(1, 0.2, 0.2),		// Int
+		Color(0, 1, 1),			// Float
+		Color(1, 0, 0)			// String
 	};
 
 	// Switch based on node type
 	switch (m_script->node_get_type(p_id)) {
-	case VScript::NODE_COMMENT: {
+	case VScript::NODE_NOTIFICATION_EVENT:
+	{
+		gn->set_title("Notification");
+		SpinBox* sb = memnew(SpinBox);
+		sb->set_min(0);
+		sb->set_max(1000000);
+		sb->set_step(1);
+		sb->set_val(m_script->notification_event_node_get_value(p_id));
+		sb->connect("value_changed", this, "_notification_event_changed", varray(p_id));
+		gn->add_child(sb);
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_EVENT, type_col[VScript::SLOT_EVENT]);
+	} break;
+	case VScript::NODE_FUNCTION_EVENT:
+	{
+		gn->set_title("Function");
+		LineEdit* le = memnew(LineEdit);
+		le->set_custom_minimum_size(Size2(150, 23));
+		le->set_max_length(1000);			// If the functions are longer than that we have an issue
+		le->set_text(m_script->function_event_node_get_value(p_id));
+		le->connect("text_changed", this, "_function_event_changed", varray(p_id));
+		gn->add_child(le);
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_EVENT, type_col[VScript::SLOT_EVENT]);
+	} break;
+	case VScript::NODE_BOOL_CONST:
+	{
+		gn->set_title("Boolean");
+		CheckButton* cb = memnew(CheckButton);
+		cb->set_pressed(m_script->bool_const_node_get_value(p_id));
+		cb->connect("toggled", this, "_bool_const_changed", varray(p_id));
+		gn->add_child(cb);
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_BOOL, type_col[VScript::SLOT_BOOL]);
+	} break;
+	case VScript::NODE_INT_CONST:
+	{
+		gn->set_title("Integer");
+		SpinBox* sb = memnew(SpinBox);
+		sb->set_min(-2147483647);	// 32 bit should be enough for anyone!
+		sb->set_max(2147483648);
+		sb->set_step(1);
+		sb->set_val(m_script->int_const_node_get_value(p_id));
+		sb->connect("value_changed", this, "_int_const_changed", varray(p_id));
+		gn->add_child(sb);
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_INT, type_col[VScript::SLOT_INT]);
+	} break;
+	case VScript::NODE_FLOAT_CONST:
+	{
+		gn->set_title("Float");
+		SpinBox* sb = memnew(SpinBox);
+		sb->set_min(-100000000.0);
+		sb->set_max(100000000.0);
+		sb->set_step(0.0001);
+		sb->set_val(m_script->float_const_node_get_value(p_id));
+		sb->connect("value_changed", this, "_float_const_changed", varray(p_id));
+		gn->add_child(sb);
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_FLOAT, type_col[VScript::SLOT_FLOAT]);
+	} break;
+	case VScript::NODE_STRING_CONST:
+	{
+		gn->set_title("String");
+		TextEdit* te = memnew(TextEdit);
+		te->set_custom_minimum_size(Size2(100, 50));
+		gn->add_child(te);
+		te->set_text(m_script->string_const_node_get_value(p_id));
+		te->connect("text_changed", this, "_string_const_changed", varray(p_id, te));
+		gn->set_slot(0, false, 0, Color(), true, VScript::SLOT_STRING, type_col[VScript::SLOT_STRING]);
+	} break;
+	case VScript::NODE_PRINT:
+	{
+		gn->set_title("Print");
+		gn->add_child(memnew(Label("Trigger")));
+		gn->add_child(memnew(Label("Message")));
+		gn->set_slot(0, true, VScript::SLOT_EVENT, type_col[VScript::SLOT_EVENT], false, 0, Color());
+		gn->set_slot(1, true, VScript::SLOT_STRING, type_col[VScript::SLOT_STRING], false, 0, Color());
+	} break;
+	case VScript::NODE_COMMENT:
+	{
 		gn->set_title("Comment");
 		TextEdit* te = memnew(TextEdit);
 		te->set_custom_minimum_size(Size2(100, 100));
@@ -198,6 +274,85 @@ void VScriptEditorView::_script_updated()
 	}
 }
 
+void VScriptEditorView::_notification_event_changed(double p_value, int p_id)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	ur->create_action("Change Notification Event", true);
+	ur->add_do_method(m_script.ptr(), "notification_event_node_set_value", p_id, (int)p_value);
+	ur->add_undo_method(m_script.ptr(), "notification_event_node_set_value", p_id, m_script->notification_event_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
+void VScriptEditorView::_function_event_changed(const String& text, int p_id)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	ur->create_action("Change Function Event", true);
+	ur->add_do_method(m_script.ptr(), "function_event_node_set_value", p_id, text);
+	ur->add_undo_method(m_script.ptr(), "function_event_node_set_value", p_id, m_script->function_event_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
+void VScriptEditorView::_bool_const_changed(bool p_pressed, int p_id)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	ur->create_action("Change Boolean Constant", true);
+	ur->add_do_method(m_script.ptr(), "bool_const_node_set_value", p_id, p_pressed);
+	ur->add_undo_method(m_script.ptr(), "bool_const_node_set_value", p_id, m_script->bool_const_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
+void VScriptEditorView::_int_const_changed(double p_value, int p_id)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	ur->create_action("Change Integer Constant", true);
+	ur->add_do_method(m_script.ptr(), "int_const_node_set_value", p_id, (int)p_value);
+	ur->add_undo_method(m_script.ptr(), "int_const_node_set_value", p_id, m_script->int_const_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
+void VScriptEditorView::_float_const_changed(double p_value, int p_id)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	ur->create_action("Change Float Constant", true);
+	ur->add_do_method(m_script.ptr(), "float_const_node_set_value", p_id, p_value);
+	ur->add_undo_method(m_script.ptr(), "float_const_node_set_value", p_id, m_script->float_const_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
+void VScriptEditorView::_string_const_changed(int p_id, Node* p_text_edit)
+{
+	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
+	TextEdit* te = p_text_edit->cast_to<TextEdit>();
+	ur->create_action("Change String Constant", true);
+	ur->add_do_method(m_script.ptr(), "string_const_node_set_value", p_id, te->get_text());
+	ur->add_undo_method(m_script.ptr(), "string_const_node_set_value", p_id, m_script->string_const_node_get_value(p_id));
+	ur->add_do_method(this, "_update_graph");
+	ur->add_undo_method(this, "_update_graph");
+	m_block_update = true;
+	ur->commit_action();
+	m_block_update = false;
+}
+
 void VScriptEditorView::_comment_edited(int p_id, Node* p_text_edit)
 {
 	UndoRedo* ur = EditorNode::get_singleton()->get_undo_redo();
@@ -225,7 +380,15 @@ void VScriptEditorView::_bind_methods()
 	ObjectTypeDB::bind_method(_MD("_node_removed", "id"), &VScriptEditorView::_node_removed);
 	ObjectTypeDB::bind_method(_MD("_node_moved", "from", "to", "id"), &VScriptEditorView::_node_moved);
 	ObjectTypeDB::bind_method(_MD("_move_node", "id", "to"), &VScriptEditorView::_move_node);
+	ObjectTypeDB::bind_method("_connection_request", &VScriptEditorView::_connection_request);
+	ObjectTypeDB::bind_method("_disconnection_request", &VScriptEditorView::_disconnection_request);
 
+	ObjectTypeDB::bind_method(_MD("_notification_event_changed", "value", "id"), &VScriptEditorView::_notification_event_changed);
+	ObjectTypeDB::bind_method(_MD("_function_event_changed", "text", "id"), &VScriptEditorView::_function_event_changed);
+	ObjectTypeDB::bind_method(_MD("_bool_const_changed", "pressed", "id"), &VScriptEditorView::_bool_const_changed);
+	ObjectTypeDB::bind_method(_MD("_int_const_changed", "value", "id"), &VScriptEditorView::_int_const_changed);
+	ObjectTypeDB::bind_method(_MD("_float_const_changed", "value", "id"), &VScriptEditorView::_float_const_changed);
+	ObjectTypeDB::bind_method(_MD("_string_const_changed", "value", "id"), &VScriptEditorView::_string_const_changed);
 	ObjectTypeDB::bind_method(_MD("_comment_edited"), &VScriptEditorView::_comment_edited);
 
 	ObjectTypeDB::bind_method(_MD("_script_updated"), &VScriptEditorView::_script_updated);
@@ -310,8 +473,15 @@ VScriptEditorView::VScriptEditorView()
 //////////////////////////////////////////////////////////////////////////
 // Editor
 
-// The format for adding is: "IconName:VisibleName", end that string with a ':' if there should be a seperator after it
+// The format for adding is: "IconName:VisibleName", end that string with a ':' if there should be a separator after it
 const char* VScriptEditor::node_names[VScript::NODE_TYPE_MAX] = {
+	"GraphInput:Notification",
+	"GraphInput:Function:",
+	"GraphScalar:Bool Constant",
+	"GraphScalar:Int Constant",
+	"GraphScalar:Float Constant:",
+	"GraphComment:String Constant",
+	"GraphOutput:Print:",
 	"GraphComment:Comment"
 };
 

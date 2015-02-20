@@ -31,6 +31,12 @@ class VScriptEditorView : public Node {
 	void _script_updated();
 
 	// Node type Event Handlers
+	void _notification_event_changed(double p_value, int p_id);
+	void _function_event_changed(const String& text, int p_id);
+	void _bool_const_changed(bool p_pressed, int p_id);
+	void _int_const_changed(double p_value, int p_id);
+	void _float_const_changed(double p_value, int p_id);
+	void _string_const_changed(int p_id, Node* p_text_edit);
 	void _comment_edited(int p_id, Node* p_text_edit);
 
 protected:
