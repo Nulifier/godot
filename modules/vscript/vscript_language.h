@@ -7,6 +7,9 @@
 class VScriptLanguage : public ScriptLanguage {
 private:
 
+	// Debug
+	String m_debug_error;
+
 	static VScriptLanguage* s_singleton;
 
 public:
@@ -120,6 +123,8 @@ public:
 	void debug_get_globals(List<String> *p_locals, List<Variant> *p_values, int p_max_subitems = -1, int p_max_depth = -1);
 
 	String debug_parse_stack_level_expression(int p_level, const String& p_expression, int p_max_subitems = -1, int p_max_depth = -1);
+
+	bool debug_break(const String& p_error, bool p_allow_continue = true);
 
 	//////////////////////////////////////////////////////////////////////////
 	// LOADER FUNCTIONS

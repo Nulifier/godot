@@ -1,5 +1,6 @@
 #include "vscript_language.h"
 #include "vscript.h"
+#include "os/thread.h"
 
 VScriptLanguage* VScriptLanguage::s_singleton = NULL;
 
@@ -70,8 +71,7 @@ String VScriptLanguage::make_function(const String& p_class, const String& p_nam
 
 String VScriptLanguage::debug_get_error() const
 {
-	/// @todo Return error once debugging is implemented in VScript
-	return "";
+	return m_debug_error;
 }
 
 int VScriptLanguage::debug_get_stack_level_count() const
@@ -112,6 +112,19 @@ void VScriptLanguage::debug_get_globals(List<String> *p_locals, List<Variant> *p
 String VScriptLanguage::debug_parse_stack_level_expression(int p_level, const String& p_expression, int p_max_subitems /*= -1*/, int p_max_depth /*= -1*/)
 {
 	return "";
+}
+
+bool VScriptLanguage::debug_break(const String& p_error, bool p_allow_continue /*= true*/)
+{
+	if (ScriptDebugger::get_singleton() && Thread::get_caller_ID() == Thread::get_main_ID()) {
+		// Set variables regarding calling function here
+		m_debug_error = p_error;
+		ScriptDebugger::get_singleton()->debug(this, p_allow_continue);
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 void VScriptLanguage::get_recognized_extensions(List<String> *p_extensions) const

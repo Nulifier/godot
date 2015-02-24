@@ -408,7 +408,19 @@ Array VScript::_get_node_connections() const
 
 void VScript::_update_script()
 {
-	/// @todo Update the script functionality from the nodes lists
+	// Iterate through all nodes, looking for Event nodes
+	for (Map<int, Node>::Element* element = m_node_map.front(); element; element = element->next()) {
+		NodeType type = element->get().type;
+		if (type == NODE_NOTIFICATION_EVENT) {
+
+		}
+		else if (type == NODE_FUNCTION_EVENT) {
+
+		}
+	}
+
+
+
 	m_needs_update = false;
 	emit_signal(SceneStringNames::get_singleton()->updated);
 }
