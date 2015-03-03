@@ -8,7 +8,8 @@ class BehaviourTreeInstance;
 /// The base class for all behaviour nodes.
 class BehaviourNode : public Resource {
 	OBJ_TYPE(BehaviourNode, Resource);
-	friend class BehaviourTreeInstance;
+	friend class BehaviourTree;				// Calls _set_id()
+	friend class BehaviourTreeInstance;		// Calls _close()
 public:
 	/// The return codes from tick().
 	enum ReturnCode {
@@ -18,8 +19,11 @@ public:
 		RET_ERROR		///< There was an error running the node. This means that the nodes were configured wrong.
 	};
 
+	static const int INVALID_ID = -1;
+
 private:
 
+	WeakRef m_tree;
 	int m_id;					///< The id of this node.
 	Vector2 m_position;			///< The position of this node in the graph. The y coordinate is also used for sorting children.
 
@@ -29,7 +33,8 @@ private:
 	void _close(Ref<BehaviourTreeInstance> p_instance) const;
 	void _exit(Ref<BehaviourTreeInstance> p_instance) const;
 
-	void _set_id(int id);	///< Sets the id. Only used for serialization.
+	void _set_tree(BehaviourTree* p_tree);	///< Sets the parent tree, used by BehaviourTree
+	void _set_id(int p_id);	///< Sets the id. Used by BehaviourTree and serialization.
 
 protected:
 
@@ -56,6 +61,8 @@ public:
 	 *	@note This is not initialized until the first execute() call.
 	 */
 	int get_id() const;
+
+	BehaviourTree* get_tree() const;
 
 	/**	Sets the position of this node in the graph.
 	 *	@note The y coordinate is used for sorting children.
@@ -95,7 +102,7 @@ class BehaviourNodeAction : public BehaviourNodeLeaf {
 class BehaviourNodeComposite : public BehaviourNode {
 	OBJ_TYPE(BehaviourNodeComposite, BehaviourNode);
 
-	Vector<Ref<BehaviourNode>> m_children;			///< The children of this node.
+	Vector<int> m_children;			///< The children of this node.
 
 	void _set_children(const Array& p_children);	///< Sets the children of this node, used for serialization.
 	Array _get_children() const;					///< Gets the children of this node, used for serialization.
@@ -104,6 +111,7 @@ class BehaviourNodeComposite : public BehaviourNode {
 	 *	This is automatically called when the position changes or a child is added or removed.
 	 */
 	void _sort_children();
+	bool m_stop_sort;
 
 protected:
 
@@ -111,27 +119,29 @@ protected:
 
 public:
 	/// Adds a child to this node.
-	void add_child(Ref<BehaviourNode> m_node);
+	void add_child(int p_child_id);
 
 	/// Removes a child from this node.
-	void remove_child(Ref<BehaviourNode> m_node);
+	void remove_child(int p_child_id);
 
 	/// Checks if this node has a specific child.
-	bool has_child(const Ref<BehaviourNode>& m_node) const;
+	bool has_child(int p_child_id) const;
 
 	/// Clears all children from this node.
 	void clear_children();
 
 	// Iteration
-	Ref<BehaviourNode> get_child(int idx) const;
+	Ref<BehaviourNode> get_child(int idx) const;	// Note, this is the index, not the id
 	int get_num_children() const;
+
+	BehaviourNodeComposite();
 };
 
 /// A node that only has one child.
 class BehaviourNodeDecorator : public BehaviourNode {
 	OBJ_TYPE(BehaviourNodeDecorator, BehaviourNode);
 
-	Ref<BehaviourNode> m_child;
+	int m_child_id;
 
 protected:
 
@@ -139,9 +149,11 @@ protected:
 
 public:
 
-	void set_child(const Ref<BehaviourNode>& p_child);
+	void set_child_id(int p_child_id);
+	int get_child_id() const;
 	Ref<BehaviourNode> get_child() const;
 
+	BehaviourNodeDecorator();
 };
 
 //////////////////////////////////////////////////////////////////////////

@@ -10,9 +10,20 @@ void BehaviourTree::_set_next_id(int p_id)
 	m_next_id = p_id;
 }
 
-int BehaviourTree::_get_new_id()
+void BehaviourTree::_set_nodes(const Dictionary& nodes)
 {
-	return m_next_id++;
+	for (const Variant* key = nodes.next(); key; key = nodes.next(key)) {
+		m_node_map[*key] = nodes[key];
+	}
+}
+
+Dictionary BehaviourTree::_get_nodes() const
+{
+	Dictionary nodes;
+	for (Map<int, Ref<BehaviourNode>>::Element* e = m_node_map.front(); e; e = e->next()) {
+		nodes[e->key()] = e->get();
+	}
+	return nodes;
 }
 
 void BehaviourTree::_bind_methods()
@@ -20,23 +31,77 @@ void BehaviourTree::_bind_methods()
 	ObjectTypeDB::bind_method(_MD("_set_next_id", "id"), &BehaviourTree::_set_next_id);
 	ObjectTypeDB::bind_method(_MD("_get_next_id"), &BehaviourTree::_get_next_id);
 
+	ObjectTypeDB::bind_method("_set_nodes", &BehaviourTree::_set_nodes);
+	ObjectTypeDB::bind_method("_get_nodes", &BehaviourTree::_get_nodes);
+
+	ObjectTypeDB::bind_method(_MD("get_new_id"), &BehaviourTree::get_new_id);
+	ObjectTypeDB::bind_method(_MD("add_node", "node_type"), &BehaviourTree::add_node);
+	ObjectTypeDB::bind_method(_MD("add_node_by_id", "new_id", "node_type"), &BehaviourTree::add_node_by_id);
+	ObjectTypeDB::bind_method(_MD("get_node:BehaviourNode", "id"), &BehaviourTree::get_node);
+	ObjectTypeDB::bind_method(_MD("has_node", "id"), &BehaviourTree::has_node);
+	ObjectTypeDB::bind_method(_MD("remove_node", "id"), &BehaviourTree::remove_node);
+
+	ObjectTypeDB::bind_method(_MD("set_root_id", "root_id"), &BehaviourTree::set_root_id);
+	ObjectTypeDB::bind_method(_MD("get_root_id"), &BehaviourTree::get_root_id);
+
 	ObjectTypeDB::bind_method(_MD("create_instance", "self"), &BehaviourTree::create_instance);
 
-	ObjectTypeDB::bind_method(_MD("set_root", "root:BehaviourNode"), &BehaviourTree::set_root);
-	ObjectTypeDB::bind_method(_MD("get_root:BehaviourNode"), &BehaviourTree::get_root);
-
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "_next_id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("_set_next_id"), _SCS("_get_next_id"));
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "root", PROPERTY_HINT_RESOURCE_TYPE, "BehaviourNode"), _SCS("set_root"), _SCS("get_root"));
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "_root_id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("set_root_id"), _SCS("get_root_id"));
+	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "_nodes", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("_set_nodes"), _SCS("_get_nodes"));
 }
 
-void BehaviourTree::set_root(const Ref<BehaviourNode>& p_root)
+int BehaviourTree::get_new_id()
 {
-	m_tree_root = p_root;
+	return m_next_id++;
 }
 
-Ref<BehaviourNode> BehaviourTree::get_root() const
+int BehaviourTree::add_node(const String& p_node_type)
 {
-	return m_tree_root;
+	int id = get_new_id();
+	add_node_by_id(id, p_node_type);
+	return id;
+}
+
+void BehaviourTree::add_node_by_id(int p_new_id, const String& p_node_type)
+{
+	ERR_FAIL_COND(has_node(p_new_id));
+
+	Object* c = ObjectTypeDB::instance(p_node_type);
+
+	ERR_FAIL_COND(!c);
+	BehaviourNode* node = c->cast_to<BehaviourNode>();
+	ERR_FAIL_COND(!node);
+
+	node->_set_id(p_new_id);
+	node->_set_tree(this);
+
+	m_node_map.insert(p_new_id, node);
+}
+
+BehaviourNode* BehaviourTree::get_node(int p_id)
+{
+	Map<int, Ref<BehaviourNode>>::Element* e = m_node_map.find(p_id);
+	ERR_FAIL_COND_V(!e, NULL);
+	return e->get().ptr();
+}
+
+bool BehaviourTree::has_node(int p_id) const
+{
+	return m_node_map.has(p_id);
+}
+
+void BehaviourTree::remove_node(int p_id)
+{
+	Map<int, Ref<BehaviourNode>>::Element* e = m_node_map.find(p_id);
+	ERR_FAIL_COND(!e);
+	m_node_map.erase(e);
+}
+
+void BehaviourTree::set_root_id(int p_id)
+{
+	ERR_FAIL_COND(!has_node(p_id));
+	m_tree_root_id = p_id;
 }
 
 Ref<BehaviourTreeInstance> BehaviourTree::create_instance(Object* p_context)
@@ -52,10 +117,10 @@ Ref<BehaviourTreeInstance> BehaviourTree::create_instance(Object* p_context)
 }
 
 BehaviourTree::BehaviourTree()
-	: m_next_id(0)
+	: m_next_id(0), m_tree_root_id(BehaviourNode::INVALID_ID)
 {
 	// Create the root node
-	set_root(memnew(BehaviourNodeRoot));
+	set_root_id(add_node("BehaviourNodeRoot"));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -118,14 +183,15 @@ void BehaviourTreeInstance::_bind_methods()
 
 void BehaviourTreeInstance::execute()
 {
-	if (m_tree->get_root().is_valid()) {
+	int root_id = m_tree->get_root_id();
+	if (m_tree->has_node(root_id)) {
 		// Make a copy of last tick's nodes
 		// We will remove the node from this copy each time we see it in the _enter() function.
 		// This means its still being executed and isn't an orphan.
 		m_orphans = m_open_nodes;
 
 		// Execute the tree
-		m_tree->get_root()->execute(this);
+		m_tree->get_node(root_id)->execute(this);
 
 		// Close all the orphans
 		for (Set<const BehaviourNode*>::Element* E = m_orphans.front(); E; E = E->next()) {

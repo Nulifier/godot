@@ -16,24 +16,51 @@ class BehaviourTree : public Resource {
 	friend class BehaviourNode;	// For _get_new_id()
 
 	/// The root of the tree.
-	Ref<BehaviourNode> m_tree_root;
+	int m_tree_root_id;
 
 	int m_next_id;				///< The next node id to be assigned.
 	int _get_next_id() const;	///< Returns m_next_id for serialization.
 	void _set_next_id(int id);	///< Sets m_next_id for serialization.
-	int _get_new_id();			///< Used by BehaviourNode to set its new ID. Called in execute as there is no way for the tree to know it exists before then.
+
+	Map<int, Ref<BehaviourNode>> m_node_map;
+
+	void _set_nodes(const Dictionary& nodes);
+	Dictionary _get_nodes() const;
 
 protected:
 
 	static void _bind_methods();
 
 public:
+	/// Gets the next valid id for a node.
+	int get_new_id();
+
+	/**	Adds a BehaviourNode to the tree.
+	 *	@param p_node_type The class name of the node to add.
+	 *	@returns The id of the newly created node.
+	 */
+	int add_node(const String& p_node_type);
+
+	/**	Adds a BehaviourNode to the tree.
+	 *	@param p_new_id The id of the node to create. Get this from get_new_id().
+	 *	@param p_node_type The class name of the node to add.
+	 */
+	void add_node_by_id(int p_new_id, const String& p_node_type);
+
+	/// Gets a BehaviourNode by id.
+	BehaviourNode* get_node(int p_id);
+
+	/// Checks if this tree has a node with a specified id.
+	bool has_node(int p_id) const;
+
+	/// Removes a node from this tree by id.
+	void remove_node(int p_id);
 
 	/// Sets the root of the tree.
-	void set_root(const Ref<BehaviourNode>& p_root);
+	void set_root_id(int p_id);
 
-	/// Gets the root of the tree.
-	Ref<BehaviourNode> get_root() const;
+	/// Gets the root id of the tree.
+	int get_root_id() const { return m_tree_root_id; }
 
 	/**	Creates and instance of this tree.
 	 *	@param p_context A context object that can be used in the behaviour nodes.
@@ -117,8 +144,6 @@ public:
 	 *	@param p_name The name of the value to clear.
 	 */
 	void clear_node_value(int p_node_id, const StringName& p_name);
-
-	// Self
 
 	/// Returns a reference to the tree that created this instance.
 	Ref<BehaviourTree> get_tree() const;
