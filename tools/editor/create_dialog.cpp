@@ -260,6 +260,16 @@ Object *CreateDialog::instance_selected() {
 	return NULL;
 }
 
+String CreateDialog::get_selected_type() const
+{
+	TreeItem *selected = search_options->get_selected();
+	if (selected) {
+		return selected->get_text(0);
+	}
+	else {
+		return String();
+	}
+}
 
 String CreateDialog::get_base_type() const {
 
@@ -552,6 +562,5 @@ CreateDialog::CreateDialog() {
 CreateDialog::~CreateDialog()
 {
 }
-
 
 #endif

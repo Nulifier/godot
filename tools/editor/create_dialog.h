@@ -67,6 +67,9 @@ public:
 
 	Object *instance_selected();
 
+	/// Gets the name of the type that was selected in the dialog or an empty string if none were.
+	String get_selected_type() const;
+
 	void set_base_type(const String& p_base);
 	String get_base_type() const;
 
