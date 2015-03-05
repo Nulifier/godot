@@ -13,7 +13,9 @@ void BehaviourTree::_set_next_id(int p_id)
 void BehaviourTree::_set_nodes(const Dictionary& nodes)
 {
 	for (const Variant* key = nodes.next(); key; key = nodes.next(key)) {
-		m_node_map[*key] = nodes[key];
+		Ref<BehaviourNode> node = nodes[*key];
+		node->_set_tree(this);
+		m_node_map[*key] = node;
 	}
 }
 
@@ -40,6 +42,12 @@ void BehaviourTree::_bind_methods()
 	ObjectTypeDB::bind_method(_MD("get_node:BehaviourNode", "id"), &BehaviourTree::get_node);
 	ObjectTypeDB::bind_method(_MD("has_node", "id"), &BehaviourTree::has_node);
 	ObjectTypeDB::bind_method(_MD("remove_node", "id"), &BehaviourTree::remove_node);
+
+	ObjectTypeDB::bind_method(_MD("set_node_pos", "id", "pos"), &BehaviourTree::set_node_pos);
+	ObjectTypeDB::bind_method(_MD("set_node_state", "state"), &BehaviourTree::set_node_state);
+
+	ObjectTypeDB::bind_method(_MD("connect_nodes", "parent_id", "child_id"), &BehaviourTree::connect_nodes);
+	ObjectTypeDB::bind_method(_MD("disconnect_nodes", "parent_id", "child_id"), &BehaviourTree::disconnect_nodes);
 
 	ObjectTypeDB::bind_method(_MD("set_root_id", "root_id"), &BehaviourTree::set_root_id);
 	ObjectTypeDB::bind_method(_MD("get_root_id"), &BehaviourTree::get_root_id);
@@ -96,6 +104,71 @@ void BehaviourTree::remove_node(int p_id)
 	Map<int, Ref<BehaviourNode>>::Element* e = m_node_map.find(p_id);
 	ERR_FAIL_COND(!e);
 	m_node_map.erase(e);
+}
+
+void BehaviourTree::get_node_list(List<int>* r_node_list) const
+{
+	// Copy the list of node ids in to the supplied list
+	for (const Map<int, Ref<BehaviourNode>>::Element* e = m_node_map.front(); e; e = e->next())
+	{
+		r_node_list->push_back(e->key());
+	}
+}
+
+void BehaviourTree::set_node_pos(int p_id, const Vector2& p_position)
+{
+	BehaviourNode* node = get_node(p_id);
+	ERR_FAIL_COND(!node);
+	node->set_position(p_position);
+}
+
+void BehaviourTree::set_node_state(int p_id, const Dictionary& p_state)
+{
+	BehaviourNode* node = get_node(p_id);
+	ERR_FAIL_COND(!node);
+	node->set_state(p_state);
+}
+
+void BehaviourTree::connect_nodes(int p_parent_id, int p_child_id)
+{
+	BehaviourNode* parent = get_node(p_parent_id);
+	ERR_FAIL_COND(parent == NULL);
+	ERR_FAIL_COND(!has_node(p_child_id));
+
+	// The parent must be a Decorator or composite
+	BehaviourNodeDecorator* decorator = parent->cast_to<BehaviourNodeDecorator>();
+	BehaviourNodeComposite* composite = parent->cast_to<BehaviourNodeComposite>();
+
+	ERR_FAIL_COND(!(decorator || composite));
+	ERR_FAIL_COND(decorator && composite);
+
+	if (decorator) {
+		decorator->set_child_id(p_child_id);
+	}
+	if (composite) {
+		composite->add_child(p_child_id);
+	}
+}
+
+void BehaviourTree::disconnect_nodes(int p_parent_id, int p_child_id)
+{
+	BehaviourNode* parent = get_node(p_parent_id);
+	ERR_FAIL_COND(parent == NULL);
+	ERR_FAIL_COND(!has_node(p_child_id));
+
+	// The parent must be a Decorator or composite
+	BehaviourNodeDecorator* decorator = parent->cast_to<BehaviourNodeDecorator>();
+	BehaviourNodeComposite* composite = parent->cast_to<BehaviourNodeComposite>();
+
+	ERR_FAIL_COND(!(decorator || composite));
+	ERR_FAIL_COND(decorator && composite);
+
+	if (decorator) {
+		decorator->set_child_id(BehaviourNode::INVALID_ID);
+	}
+	if (composite) {
+		composite->remove_child(p_child_id);
+	}
 }
 
 void BehaviourTree::set_root_id(int p_id)

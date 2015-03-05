@@ -58,16 +58,20 @@ void BehaviourNode::_bind_methods()
 	ObjectTypeDB::bind_method(_MD("_set_id", "id"), &BehaviourNode::_set_id);
 	ObjectTypeDB::bind_method(_MD("get_id"), &BehaviourNode::get_id);
 
+	ObjectTypeDB::bind_method(_MD("_set_parent_id", "id"), &BehaviourNode::_set_parent_id);
+	ObjectTypeDB::bind_method(_MD("get_parent_id"), &BehaviourNode::get_parent_id);
+
 	ObjectTypeDB::bind_method(_MD("set_position", "position"), &BehaviourNode::set_position);
 	ObjectTypeDB::bind_method(_MD("get_position"), &BehaviourNode::get_position);
 
+	ObjectTypeDB::bind_method(_MD("set_state", "state"), &BehaviourNode::set_state);
+	ObjectTypeDB::bind_method(_MD("get_state"), &BehaviourNode::get_state);
+
 	ObjectTypeDB::bind_method(_MD("execute", "instance:BehaviourTreeInstance"), &BehaviourNode::execute);
 
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "position"), _SCS("set_position"), _SCS("get_position"));
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "position", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("set_position"), _SCS("get_position"));
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "id", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("_set_id"), _SCS("get_id"));
-
-	// Used by composite nodes to resort children.
-	ADD_SIGNAL(MethodInfo("position_changed"));
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "parent", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NOEDITOR), _SCS("_set_parent_id"), _SCS("get_parent_id"));
 
 	BIND_CONSTANT(RET_SUCCESS);
 	BIND_CONSTANT(RET_FAILURE);
@@ -75,6 +79,76 @@ void BehaviourNode::_bind_methods()
 	BIND_CONSTANT(RET_ERROR);
 
 	BIND_CONSTANT(INVALID_ID);
+}
+
+int BehaviourNode::get_id() const
+{
+	return m_id;
+}
+
+BehaviourTree* BehaviourNode::get_tree() const
+{
+	Variant ref = m_tree.get_ref();
+	if (ref.get_type() == Variant::NIL) {
+		return NULL;
+	}
+	Ref<BehaviourTree> tree = ref;
+	return tree.ptr();
+}
+
+void BehaviourNode::set_position(const Vector2& p_position)
+{
+	m_position = p_position;
+	
+	// Check if we have a parent and if its a composite node
+	// Signals don't work for this as we can't set them up when serializing as we don't have a reference to the tree yet
+	if (get_parent_id() != INVALID_ID) {
+		BehaviourNode* node = get_tree()->get_node(get_parent_id());
+		BehaviourNodeComposite* c = node->cast_to<BehaviourNodeComposite>();
+		if (c) {
+			c->_sort_children();
+		}
+	}
+}
+
+const Vector2& BehaviourNode::get_position() const
+{
+	return m_position;
+}
+
+Dictionary BehaviourNode::get_state() const
+{
+	Dictionary state;
+
+	List<PropertyInfo> properties;
+	get_property_list(&properties);
+
+	for (List<PropertyInfo>::Element* e = properties.front(); e; e = e->next()) {
+		PropertyInfo& prop = e->get();
+
+		// Don't store categories
+		if (prop.usage&PROPERTY_USAGE_CATEGORY)
+			continue;;
+
+		bool valid;
+		ERR_FAIL_COND_V(state.has(prop.name), state);
+		state[prop.name] = get(prop.name, &valid);
+		ERR_FAIL_COND_V(!valid, state);
+	}
+
+	return state;
+}
+
+void BehaviourNode::set_state(const Dictionary& p_state)
+{
+	for (const Variant* key = p_state.next(); key; key = p_state.next(key)) {
+		bool valid;
+		set(*key, p_state[*key], &valid);
+		if (!valid)
+			print_line("");
+		ERR_EXPLAIN((String)*key);
+		ERR_FAIL_COND(!valid);
+	}
 }
 
 BehaviourNode::ReturnCode BehaviourNode::execute(Ref<BehaviourTreeInstance> m_instance)
@@ -98,32 +172,8 @@ BehaviourNode::ReturnCode BehaviourNode::execute(Ref<BehaviourTreeInstance> m_in
 	return status;
 }
 
-int BehaviourNode::get_id() const
-{
-	return m_id;
-}
-
-BehaviourTree* BehaviourNode::get_tree() const
-{
-	Variant ref = m_tree.get_ref();
-	ERR_FAIL_COND_V(ref.get_type() == Variant::NIL, NULL);
-	Ref<BehaviourTree> tree = ref;
-	return tree.ptr();
-}
-
-void BehaviourNode::set_position(const Vector2& p_position)
-{
-	m_position = p_position;
-	emit_signal("position_changed");
-}
-
-const Vector2& BehaviourNode::get_position() const
-{
-	return m_position;
-}
-
 BehaviourNode::BehaviourNode()
-	: m_id(INVALID_ID)
+	: m_id(INVALID_ID), m_parent(INVALID_ID)
 {
 }
 
@@ -151,7 +201,8 @@ Array BehaviourNodeComposite::_get_children() const
 
 void BehaviourNodeComposite::_sort_children()
 {
-	if (!m_stop_sort) {
+	BehaviourTree* tree = get_tree();
+	if (!m_stop_sort && tree) {
 		// Get and check the size of the children list
 		int len = m_children.size();
 		if (len == 0)
@@ -162,7 +213,7 @@ void BehaviourNodeComposite::_sort_children()
 
 		// Setup the sorter
 		SortArray<int, BehaviourNodeCompare> sorter;
-		sorter.compare.tree = get_tree();
+		sorter.compare.tree = tree;
 
 		// Sort
 		sorter.sort(data, len);
@@ -188,10 +239,17 @@ void BehaviourNodeComposite::add_child(int p_child_id)
 {
 	ERR_FAIL_COND(has_child(p_child_id));
 
+	// When loading from a file we might not have the tree yet
+	BehaviourTree* tree = get_tree();
+
+	// Check if it already has a parent
+	if (tree) {
+		BehaviourNode* node = get_tree()->get_node(p_child_id);
+		ERR_FAIL_COND(node->get_parent_id() != INVALID_ID);
+		node->_set_parent_id(get_id());
+	}
+
 	m_children.push_back(p_child_id);
-	
-	// Connect to the child's postion_changed signal so we can resort when the position changes
-	get_tree()->get_node(p_child_id)->connect("position_changed", this, "_sort_children");
 
 	// Resort the children
 	_sort_children();
@@ -204,8 +262,9 @@ void BehaviourNodeComposite::remove_child(int p_child_id)
 		if (m_children[i] == p_child_id) {
 			m_children.remove(i);
 
-			// Disconnect from the child's position_changed signal
-			get_tree()->get_node(p_child_id)->disconnect("position_changed", this, "_sort_children");
+			// Make the child parentless
+			BehaviourNode* node = get_tree()->get_node(p_child_id);
+			node->_set_parent_id(INVALID_ID);
 			break;
 		}
 	}
@@ -226,7 +285,8 @@ void BehaviourNodeComposite::clear_children()
 	// Disconnect from all of their position_changed signals.
 	BehaviourTree* tree = get_tree();
 	for (int i = 0; i < m_children.size(); ++i) {
-		tree->get_node(m_children[i])->disconnect("position_changed", this, "_sort_children");
+		BehaviourNode* node = tree->get_node(m_children[i]);
+		node->_set_parent_id(INVALID_ID);
 	}
 
 	m_children.clear();
@@ -235,6 +295,14 @@ void BehaviourNodeComposite::clear_children()
 Ref<BehaviourNode> BehaviourNodeComposite::get_child(int idx) const
 {
 	ERR_FAIL_INDEX_V(idx, m_children.size(), Ref<BehaviourNode>());
+	BehaviourNode* node = get_tree()->get_node(m_children[idx]);
+	ERR_FAIL_COND_V(!node, Ref<BehaviourNode>());
+	return node;
+}
+
+int BehaviourNodeComposite::get_child_id(int idx) const
+{
+	ERR_FAIL_INDEX_V(idx, m_children.size(), INVALID_ID);
 	return m_children[idx];
 }
 
@@ -261,7 +329,22 @@ void BehaviourNodeDecorator::_bind_methods()
 
 void BehaviourNodeDecorator::set_child_id(int p_child_id)
 {
+	// The tree doesn't exist yet for serialization
+	BehaviourTree* tree = get_tree();
+
+	// Eliminate the child's previous parent id
+	if (m_child_id != INVALID_ID && tree) {
+		BehaviourNode* node = get_tree()->get_node(m_child_id);
+		node->_set_parent_id(INVALID_ID);
+	}
+
 	m_child_id = p_child_id;
+
+	// Update the child's parent
+	if (m_child_id != INVALID_ID && tree) {
+		BehaviourNode* node = get_tree()->get_node(m_child_id);
+		node->_set_parent_id(get_id());
+	}
 }
 
 int BehaviourNodeDecorator::get_child_id() const

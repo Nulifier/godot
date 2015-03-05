@@ -4,6 +4,10 @@
 #include "behaviour_tree.h"
 #include "behaviour_node_types.h"
 
+#ifdef TOOLS_ENABLED
+#include "behaviour_tree_editor.h"
+#endif
+
 void register_behaviourtree_types()
 {
 	ObjectTypeDB::register_type<BehaviourTree>();
@@ -32,8 +36,13 @@ void register_behaviourtree_types()
 
 	// Actions
 	ObjectTypeDB::register_type<BehaviourNodeWait>();
+	ObjectTypeDB::register_type<BehaviourNodePrint>();
 
 	// Conditions
+
+#ifdef TOOLS_ENABLED
+	EditorPlugins::add_by_type<BehaviourTreePlugin>();
+#endif
 }
 
 void unregister_behaviourtree_types()

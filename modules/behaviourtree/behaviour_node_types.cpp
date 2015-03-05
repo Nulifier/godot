@@ -343,3 +343,26 @@ BehaviourNodeWait::BehaviourNodeWait()
 	: m_time_delay(0)
 {
 }
+
+void BehaviourNodePrint::_bind_methods()
+{
+	ObjectTypeDB::bind_method(_MD("set_message", "message"), &BehaviourNodePrint::set_message);
+	ObjectTypeDB::bind_method(_MD("get_message"), &BehaviourNodePrint::get_message);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "message"), _SCS("set_message"), _SCS("get_message"));
+}
+
+BehaviourNode::ReturnCode BehaviourNodePrint::tick(Ref<BehaviourTreeInstance> p_instance) const
+{
+	print_line(m_message);
+	return RET_SUCCESS;
+}
+
+void BehaviourNodePrint::set_message(const String& p_message)
+{
+	m_message = p_message;
+}
+
+const String& BehaviourNodePrint::get_message() const
+{
+	return m_message;
+}

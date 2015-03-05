@@ -154,4 +154,19 @@ public:
 	BehaviourNodeWait();
 };
 
+/// This behaviour node is only used for debugging and mocking.
+class BehaviourNodePrint : public BehaviourNodeAction {
+	OBJ_TYPE(BehaviourNodePrint, BehaviourNodeAction);
+
+	String m_message;
+
+protected:
+	static void _bind_methods();
+
+	ReturnCode tick(Ref<BehaviourTreeInstance> p_instance) const;
+public:
+	void set_message(const String& p_message);
+	const String& get_message() const;
+};
+
 #endif // BEHAVIOUR_NODE_TYPES_H

@@ -10,6 +10,8 @@ class BehaviourNode : public Resource {
 	OBJ_TYPE(BehaviourNode, Resource);
 	friend class BehaviourTree;				// Calls _set_id()
 	friend class BehaviourTreeInstance;		// Calls _close()
+	friend class BehaviourNodeComposite;	// Calls _set_parent_id()
+	friend class BehaviourNodeDecorator;	// Calls _set_parent_id()
 public:
 	/// The return codes from tick().
 	enum ReturnCode {
@@ -25,6 +27,7 @@ private:
 
 	WeakRef m_tree;
 	int m_id;					///< The id of this node.
+	int m_parent;
 	Vector2 m_position;			///< The position of this node in the graph. The y coordinate is also used for sorting children.
 
 	void _enter(Ref<BehaviourTreeInstance> p_instance) const;
@@ -35,6 +38,7 @@ private:
 
 	void _set_tree(BehaviourTree* p_tree);	///< Sets the parent tree, used by BehaviourTree
 	void _set_id(int p_id);	///< Sets the id. Used by BehaviourTree and serialization.
+	void _set_parent_id(int p_parent) { m_parent = p_parent; }
 
 protected:
 
@@ -62,6 +66,9 @@ public:
 	 */
 	int get_id() const;
 
+	/// Gets the parent id of this node or INVALID_ID if it doesn't have one.
+	int get_parent_id() const { return m_parent; }
+
 	BehaviourTree* get_tree() const;
 
 	/**	Sets the position of this node in the graph.
@@ -71,6 +78,12 @@ public:
 
 	/// Gets the position of this node in the graph.
 	const Vector2& get_position() const;
+
+	/// Gets a copy of all the properties of this node for use in UndoRedo.
+	Dictionary get_state() const;
+
+	/// Sets all the properties of this node for use in UndoRedo.
+	void set_state(const Dictionary& p_state);
 
 	/**	Executes this node.
 	 *	@param p_instance A reference to the instance that this node is in.
@@ -101,6 +114,7 @@ class BehaviourNodeAction : public BehaviourNodeLeaf {
 /// A node that can have multiple children and executes each of them.
 class BehaviourNodeComposite : public BehaviourNode {
 	OBJ_TYPE(BehaviourNodeComposite, BehaviourNode);
+	friend class BehaviourNode;	// Calls _sort_children()
 
 	Vector<int> m_children;			///< The children of this node.
 
@@ -132,6 +146,7 @@ public:
 
 	// Iteration
 	Ref<BehaviourNode> get_child(int idx) const;	// Note, this is the index, not the id
+	int get_child_id(int idx) const;
 	int get_num_children() const;
 
 	BehaviourNodeComposite();

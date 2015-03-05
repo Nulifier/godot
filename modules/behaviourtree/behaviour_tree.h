@@ -56,6 +56,20 @@ public:
 	/// Removes a node from this tree by id.
 	void remove_node(int p_id);
 
+	void get_node_list(List<int>* r_node_list) const;
+
+	/// Sets the position of a node by id.
+	void set_node_pos(int p_id, const Vector2& p_position);
+
+	/// Sets the state of a node by id.
+	void set_node_state(int p_id, const Dictionary& p_state);
+
+	/// Connects two nodes together.
+	void connect_nodes(int p_parent_id, int p_child_id);
+
+	/// Disconnects a child from a parent.
+	void disconnect_nodes(int p_parent_id, int p_child_id);
+
 	/// Sets the root of the tree.
 	void set_root_id(int p_id);
 
